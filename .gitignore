@@ -1,0 +1,15 @@
+# pdf files
+*.pdf
+
+# LaTeX intermediate files
+*.aux
+*.dvi
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+/out/

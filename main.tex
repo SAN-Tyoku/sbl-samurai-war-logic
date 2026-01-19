@@ -1,0 +1,177 @@
+\documentclass[uplatex,a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{here}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    pdftitle={SBL-WAR Calculation Methodology},
+    pdfauthor={SAN-Chi Chokusou}
+}
+
+\newcommand{\mvar}[1]{\mathrm{#1}}
+\renewcommand{\abstractname}{Abstract}
+\renewcommand{\refname}{References}
+\newcommand{\refurl}[1]{{\small \url{#1}}}
+\newcommand{\EnToday}{
+    \ifcase\month\or
+    January\or February\or March\or April\or May\or June\or
+    July\or August\or September\or October\or November\or December\fi
+    \space\number\day, \number\year
+}
+
+\title{\textbf{Methodology for SBL-WAR Calculation}}
+\author{SAN-Chi Chokusou \\ \small Lead Architect, SBL Samurai Japan Project}
+\date{\EnToday}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document outlines the computational logic and mathematical framework of the Wins Above Replacement (WAR) metric employed for player selection in the SBL Samurai Japan project. The system incorporates standard Sabermetric indicators while introducing proprietary corrections tailored to the specific league environment, including hierarchical compression algorithms and logarithmic adjustments for outlier suppression.
+\end{abstract}
+
+\section{Overview}
+The SBL-WAR system is designed to evaluate player contributions relative to a theoretical replacement level. Unlike traditional models, our approach dynamically adjusts for league-wide scoring environments and applies non-linear penalties to stabilize evaluations against extreme statistical variances.
+
+\section{Fielder Evaluation}
+Fielder WAR is derived using the following formula:
+\begin{equation}
+\mvar{WAR} = \frac{\mvar{Batting} + \mvar{Baserunning} + \mvar{Fielding} + \mvar{Replacement}}{\mvar{RPW}_{\text{lg}}}
+\end{equation}
+
+\subsection{Batting Contribution}
+First, Weighted On-Base Average (wOBA) is computed using linear weights:
+\begin{equation}
+\mvar{wOBA} = \frac{w_1 \cdot \mvar{uBB} + w_2 \cdot \mvar{HBP} + w_3 \cdot \mvar{1B} + w_4 \cdot \mvar{2B} + w_5 \cdot \mvar{3B} + w_6 \cdot \mvar{HR}}{\mvar{PA}}
+\end{equation}
+Using the league average $\mvar{wOBA}_{\text{lg}}$, the scaling factor $\mvar{wOBAScale}$ is determined to match the On-Base Percentage (OBP) scale:
+\begin{equation}
+\mvar{wOBAScale} = \frac{\mvar{OBP}_{\text{lg}}}{\mvar{wOBA}_{\text{lg}}}
+\end{equation}
+
+Subsequently, the standardized metric $\mvar{wRC}^+$ is calculated:
+\begin{equation}
+\mvar{wRC}^+ = \frac{\frac{(\mvar{wOBA} - \mvar{wOBA}_{\text{lg}})}{\mvar{wOBAScale}} + R/\mvar{PA}_{\text{lg}}}{R/\mvar{PA}_{\text{lg}}} \times 100
+\end{equation}
+
+The final $\mvar{Batting}$ component applies a \textbf{hierarchical compression function} ($f_{\text{tiered}}$) to the deviation from the league mean ($\Delta \mvar{wRC}^+ = \mvar{wRC}^+ - \mvar{wRC}^+_{\text{lg}}$):
+\begin{equation}
+\mvar{Batting} = f_{\text{tiered}}(\Delta \mvar{wRC}^+, \mvar{Tiers}) \times \mvar{ScaleFactor}
+\end{equation}
+Note: $f_{\text{tiered}}$ acts as a non-linear damping function that progressively mitigates the impact of extreme outliers.
+
+\subsection{Baserunning Contribution}
+Weighted Stolen Base Runs ($\mvar{wSB}$) and Ultimate Base Running ($\mvar{UBR}$) are defined as:
+\begin{equation}
+\mvar{wSB} = \left[ (\mvar{SB} \cdot 0.2 + \mvar{CS} \cdot (-0.398)) - (\mvar{LgRunRate} \cdot (\mvar{1B} + \mvar{BB} + \mvar{HBP})) \right] \times 0.1
+\end{equation}
+\begin{equation}
+\mvar{UBR} = (\mvar{GoodBR} \cdot \mvar{Point}_{\text{Good}}) + (\mvar{DP} \cdot \mvar{Point}_{\text{DP}})
+\end{equation}
+The total baserunning value is $\mvar{Baserunning} = (\mvar{wSB} + \mvar{UBR}) \times \mvar{Multiplier}$. Negative values are adjusted using additional correction coefficients.
+
+\subsection{Fielding Contribution}
+Fielding value is defined as $\mvar{Fielding} = \mvar{UZR} + \mvar{PosAdj}$.
+\begin{equation}
+\mvar{UZR}_{\text{basic}} = \begin{cases}
+    (\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot 6) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{Catchers}) \\
+    (\mvar{FinePlay} - E \cdot 2) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{Others})
+\end{cases}
+\end{equation}
+For cases where $\mvar{UZR}_{\text{basic}} \le -1.2$, we define the deviation magnitude as $\delta = \lvert \mvar{UZR}_{\text{basic}} + 1.2 \rvert$. The applied penalty is:
+\begin{equation}
+\mvar{Penalty} = -\left( \frac{\ln \delta}{\ln 1.2} + 1.2 \right)
+\end{equation}
+This logarithmic adjustment prevents excessive penalization of extreme outliers.
+\subsection{Replacement Level}
+\begin{equation}
+\mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot 0.2}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot 0.1
+\end{equation}
+
+\subsection{Runs Per Win (RPW)}
+The value of runs required to generate one win, denoted as $\mvar{RPW}_{\text{lg}}$, is calculated dynamically based on the league's scoring environment:
+\begin{equation}
+\mvar{RPW}_{\text{lg}} = \mvar{BaseRPW} + \operatorname{sgn}(\Delta R) \cdot \ln(|\Delta R| + 1)
+\end{equation}
+where $\Delta R = R/G_{\text{lg}} - \mvar{BaseRuns}$. Note that $\mvar{BaseRPW}$ and $\mvar{BaseRuns}$ are predetermined baseline constants. Boundary constraints (clipping) are applied to the final value to prevent anomalies caused by small sample sizes in specific seasons.
+
+\section{Pitcher Evaluation}
+Pitcher WAR emphasizes process over results (FIP-based) to isolate pitching performance from defensive variance:
+\begin{equation}
+\mvar{WAR} = (\mvar{WAA} \cdot C_{\text{WAA}} + \mvar{Rep} \cdot C_{\text{Rep}} - \mvar{WHIP} \cdot C_{\text{WHIP}} + (\mvar{AvgIPA} - \mvar{IPA})) \cdot \mvar{RoleMult}_{\text{war}}
+\end{equation}
+
+\subsection{Runs Above Average (RAA)}
+\begin{equation}
+\mvar{FIP} = \frac{13 \cdot \mvar{HR} + 3 \cdot (\mvar{BB} + \mvar{HBP}) - 2 \cdot K}{\mvar{IP}} + C_{\text{fip}}
+\end{equation}
+RAA incorporates an ERA-based penalty for underperformance relative to FIP:
+\begin{equation}
+\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{6 \cdot \max(\mvar{ERA} + \mvar{WHIP}, 1.5)}
+\end{equation}
+Where, $k_{\text{adj}}$ serves as a penalty coefficient, set to 3.0 when $\mvar{ERA} \ge 3.0$ and 1.0 otherwise.
+
+\subsection{WAA and RPW}
+The pitcher-specific run value ($\mvar{RPW}_{p}$) is non-linear:
+\begin{equation}
+\mvar{RPW}_{p} = 2 \cdot \left[ v_{\text{rpw}} \cdot \left( 3 \cdot \mvar{AvgRuns} - \frac{\mvar{RAA}}{\mvar{App}} \right) \right]^{0.715}
+\end{equation}
+$\mvar{WAA}$ is derived as $\mvar{RAA} / \mvar{RPW}_{p}$.
+
+\subsection{Replacement Level \& Innings Penalty}
+\begin{equation}
+\mvar{Rep} = \left( \frac{0.105 \cdot \mvar{IP}}{9} + \frac{\mvar{Adj}_{\text{pos}} \cdot \mvar{IP}}{9 \cdot \mvar{InningsPenalty}} \right) \cdot \mvar{RoleMult}_{\text{rep}}
+\end{equation}
+The term $\mvar{InningsPenalty}$ accounts for the negative value of accumulating innings with poor efficiency, reflecting the structural difficulty of replacing sustained underperformance.
+\begin{equation}
+\mvar{InningsPenalty} = 1.0 + \max(0, (\mvar{ERA}+\mvar{WHIP}) - \mvar{Threshold}) \cdot \mvar{Multiplier}
+\end{equation}
+This ensures that low-quality innings ("eating innings" with poor efficiency) do not artificially inflate WAR.
+
+\subsection{IPA (Innings per Plate Appearance)}
+A custom metric approximating batters faced per inning:
+\begin{equation}
+\mvar{IPA} = \frac{\mvar{IP} \cdot 3 + H + \mvar{BB} + \mvar{HBP}}{\mvar{IP}}
+\end{equation}
+
+\begin{thebibliography}{9}
+
+\bibitem{fangraphs}
+FanGraphs: WAR for Position Players [Accessed: Jan. 17, 2026] \\
+\refurl{https://library.fangraphs.com/war/war-position-players/}
+
+\bibitem{102_f}
+1.02 Essence of Baseball: WAR (Wins Above Replacement) 【野手】 [Accessed: Jan. 17, 2026] \\
+\refurl{https://1point02.jp/op/gnav/glossary/gls_explanation.aspx?eid=20031}
+
+\bibitem{102_p}
+1.02 Essence of Baseball: WAR (Wins Above Replacement) 【投手】 [Accessed: Jan. 17, 2026] \\
+\refurl{https://1point02.jp/op/gnav/glossary/gls_explanation.aspx?eid=20032}
+
+\bibitem{npb_stats}
+NPB STATS: 投手WAR [Accessed: Jan. 17, 2026] \\
+\refurl{http://npbstats.com/glossary/投手war/}
+
+\end{thebibliography}
+
+\section*{License}
+
+\noindent This document is licensed under \href{http://creativecommons.org/licenses/by-nc-nd/4.0/}{\textbf{CC BY-NC-ND 4.0}} (Attribution-NonCommercial-NoDerivatives).
+
+\begin{itemize}
+    \item \textbf{BY (Attribution):} Credit must be given to \textbf{SAN-Chi Chokusou}.
+    \item \textbf{NC (NonCommercial):} You may not use this material for commercial purposes.
+    \item \textbf{ND (NoDerivatives):} If you remix, transform, or build upon the material, you may not distribute the modified material.
+\end{itemize}
+
+\end{document}
