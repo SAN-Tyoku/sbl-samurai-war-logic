@@ -115,11 +115,27 @@ Pitcher WAR emphasizes process over results (FIP-based) to isolate pitching perf
 \begin{equation}
 \mvar{FIP} = \frac{13 \cdot \mvar{HR} + 3 \cdot (\mvar{BB} + \mvar{HBP}) - 2 \cdot K}{\mvar{IP}} + C_{\text{fip}}
 \end{equation}
-RAA incorporates an ERA-based penalty for underperformance relative to FIP:
+
+RAA is derived from FIP, incorporating specific adjustments for ERA divergence ($k_{\text{adj}}$) and starting pitcher workload efficiency ($w_{\text{sp}}$):
+
 \begin{equation}
-\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{6 \cdot \max(\mvar{ERA} + \mvar{WHIP}, 1.5)}
+\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{6 \cdot \max(\mvar{ERA} + \mvar{WHIP}, 1.5)} \cdot w_{\text{sp}}
 \end{equation}
-Where, $k_{\text{adj}}$ serves as a penalty coefficient, set to 3.0 when $\mvar{ERA} \ge 3.0$ and 1.0 otherwise.
+
+The coefficient $k_{\text{adj}}$ serves as a divergence penalty, defined as $3.0$ when $\mvar{ERA} \ge 3.0$, and $1.0$ otherwise.
+
+The workload adjustment factor $w_{\text{sp}}$ accounts for the \textbf{structural devaluation} associated with insufficient inning accumulation by starting pitchers. It is formulated as a step function:
+
+\begin{equation}
+w_{\text{sp}} = \begin{cases} 
+0.5 & \text{if } \frac{\mvar{IP}}{\mvar{Starts}} < \min(\mvar{AvgIPS} + 1.0, 8.0) \\
+1.0 & \text{otherwise}
+\end{cases}
+\end{equation}
+
+Here, $\mvar{AvgIPS}$ denotes the league average Innings Per Start.
+
+\noindent Note: This penalty applies exclusively to pitchers designated as starters to mitigate value inflation resulting from abbreviated appearances.
 
 \subsection{WAA and RPW}
 The pitcher-specific run value ($\mvar{RPW}_{p}$) is non-linear:
