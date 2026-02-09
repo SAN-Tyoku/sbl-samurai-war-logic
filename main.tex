@@ -84,15 +84,27 @@ The total baserunning value is $\mvar{Baserunning} = (\mvar{wSB} + \mvar{UBR}) \
 Fielding value is defined as $\mvar{Fielding} = \mvar{UZR} + \mvar{PosAdj}$.
 \begin{equation}
 \mvar{UZR}_{\text{basic}} = \begin{cases}
-    (\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot 6) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{Catchers}) \\
-    (\mvar{FinePlay} - E \cdot 2) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{Others})
+(\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot 6) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{for Catchers}) \\
+(\mvar{FinePlay} - E \cdot 2) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{for Others})
 \end{cases}
 \end{equation}
-For cases where $\mvar{UZR}_{\text{basic}} \le -1.2$, we define the deviation magnitude as $\delta = \lvert \mvar{UZR}_{\text{basic}} + 1.2 \rvert$. The applied penalty is:
+
+To ensure statistical stability and account for diminishing marginal utility, logarithmic adjustments are applied to extreme outliers based on dynamic thresholds determined by the league environment.
+
+\paragraph{Negative Adjustment (Error Correction):}
+For cases where $\mvar{UZR}_{\text{basic}} \le T_{\text{low}}$, we define the deviation magnitude as $\delta_- = \lvert \mvar{UZR}_{\text{basic}} - T_{\text{low}} \rvert$. To maintain continuity at the threshold, the adjusted value is defined as:
 \begin{equation}
-\mvar{Penalty} = -\left( \frac{\ln \delta}{\ln 1.2} + 1.2 \right)
+\mvar{UZR} = T_{\text{low}} - \frac{\ln(\delta_- + 1)}{\ln \beta}
 \end{equation}
-This logarithmic adjustment prevents excessive penalization of extreme outliers.
+where $T_{\text{low}}$ is the lower bound threshold (e.g., $-1.2$) and $\beta$ is the logarithmic base (e.g., $1.2$), calibrated to mitigate excessive devaluation of players with extreme error rates.
+
+\paragraph{Positive Adjustment (Compression):}
+Similarly, for cases where $\mvar{UZR}_{\text{basic}} > T_{\text{high}}$, positive outliers are compressed:
+\begin{equation}
+\mvar{UZR} = T_{\text{high}} + \frac{\ln(\mvar{UZR}_{\text{basic}} - T_{\text{high}} + 1)}{\ln \beta}
+\end{equation}
+where $T_{\text{high}}$ is the upper bound threshold (e.g., $1.2$). This formulation ensures that elite defensive impact does not disproportionately skew the overall WAR distribution beyond the specified limit.
+
 \subsection{Replacement Level}
 \begin{equation}
 \mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot 0.2}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot 0.1
