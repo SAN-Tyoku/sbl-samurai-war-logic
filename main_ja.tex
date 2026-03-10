@@ -1,0 +1,199 @@
+\documentclass[uplatex,a4paper,11pt,dvipdfmx]{jsarticle}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{here}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    pdftitle={SBL-WAR 算出方法},
+    pdfauthor={SAN値直送}
+}
+
+\newcommand{\mvar}[1]{\mathrm{#1}}
+\renewcommand{\abstractname}{概要}
+\renewcommand{\refname}{参考文献}
+\newcommand{\refurl}[1]{{\small \url{#1}}}
+
+\title{\textbf{SBL-WAR 算出方法}}
+\author{SAN値直送 \\ \small SBL 侍ジャパンプロジェクト}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本ドキュメントは、SBL 侍ジャパンにおける選手選考に用いられる Wins Above Replacement (WAR) 指標の計算ロジックおよび数理的フレームワークについて概説するものである。本システムは標準的なセイバーメトリクス指標を取り入れつつ、特定のリーグ環境に合わせた独自の補正を導入している。これには、外れ値を抑制するための階層的圧縮アルゴリズムおよび対数調整が含まれる。
+\end{abstract}
+
+\section{概要}
+SBL-WAR システムは、理論上のリプレースメントレベルに対する選手の貢献度を評価するために設計されている。従来モデルとは異なり、本アプローチはリーグ全体の得点環境を動的に調整し、極端な統計的分散に対して評価を安定させるための非線形ペナルティを適用する。
+
+\section{野手評価}
+野手 WAR は以下の計算式により算出される。
+\begin{equation}
+\mvar{WAR} = \frac{\mvar{Batting} + \mvar{Baserunning} + \mvar{Fielding} + \mvar{Replacement}}{\mvar{RPW}_{\text{lg}}}
+\end{equation}
+
+\subsection{打撃貢献}
+まず、線形ウェイトを用いて加重出塁率 (wOBA) を算出する。
+\begin{equation}
+\mvar{wOBA} = \frac{w_1 \cdot \mvar{uBB} + w_2 \cdot \mvar{HBP} + w_3 \cdot \mvar{1B} + w_4 \cdot \mvar{2B} + w_5 \cdot \mvar{3B} + w_6 \cdot \mvar{HR}}{\mvar{PA}}
+\end{equation}
+リーグ平均 $\mvar{wOBA}_{\text{lg}}$ を用いて、出塁率 (OBP) スケールに合わせるためのスケーリング係数 $\mvar{wOBAScale}$ を決定する。
+\begin{equation}
+\mvar{wOBAScale} = \frac{\mvar{OBP}_{\text{lg}}}{\mvar{wOBA}_{\text{lg}}}
+\end{equation}
+
+次に、標準化指標 $\mvar{wRC}^+$ を算出する。
+\begin{equation}
+\mvar{wRC}^+ = \frac{\frac{(\mvar{wOBA} - \mvar{wOBA}_{\text{lg}})}{\mvar{wOBAScale}} + R/\mvar{PA}_{\text{lg}}}{R/\mvar{PA}_{\text{lg}}} \times 100
+\end{equation}
+
+最終的な $\mvar{Batting}$ 成分は、リーグ平均からの乖離 ($\Delta \mvar{wRC}^+ = \mvar{wRC}^+ - \mvar{wRC}^+_{\text{lg}}$) に対して\textbf{階層的圧縮関数} ($f_{\text{tiered}}$) を適用する。
+\begin{equation}
+\mvar{Batting} = f_{\text{tiered}}(\Delta \mvar{wRC}^+, \mvar{Tiers}) \times \mvar{ScaleFactor}
+\end{equation}
+注: $f_{\text{tiered}}$ は非線形減衰関数として機能し、極端な外れ値の影響を段階的に緩和する。
+
+\subsection{走塁貢献}
+加重盗塁得点 ($\mvar{wSB}$) および総合走塁 ($\mvar{UBR}$) は次のように定義される。
+\begin{equation}
+\mvar{wSB} = \left[ (\mvar{SB} \cdot 0.2 + \mvar{CS} \cdot (-0.398)) - (\mvar{LgRunRate} \cdot (\mvar{1B} + \mvar{BB} + \mvar{HBP})) \right] \times 0.1
+\end{equation}
+\begin{equation}
+\mvar{UBR} = (\mvar{GoodBR} \cdot \mvar{Point}_{\text{Good}}) + (\mvar{DP} \cdot \mvar{Point}_{\text{DP}})
+\end{equation}
+走塁の合計値は $\mvar{Baserunning} = (\mvar{wSB} + \mvar{UBR}) \times \mvar{Multiplier}$ となる。マイナス値については追加の補正係数により調整される。
+
+\subsection{守備貢献}
+守備値は $\mvar{Fielding} = \mvar{UZR} + \mvar{PosAdj}$ として定義される。
+\begin{equation}
+\mvar{UZR}_{\text{basic}} = \begin{cases}
+(\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot 6) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{捕手}) \\
+(\mvar{FinePlay} - E \cdot 2) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{その他})
+\end{cases}
+\end{equation}
+
+統計的安定性を確保し限界効用の逓減を考慮するため、リーグ環境によって決定される動的閾値に基づき、極端な外れ値に対して対数調整を適用する。
+
+\paragraph{マイナス調整 (エラー補正):}
+$\mvar{UZR}_{\text{basic}} \le T_{\text{low}}$ の場合、乖離幅を $\delta_- = \lvert \mvar{UZR}_{\text{basic}} - T_{\text{low}} \rvert$ と定義する。閾値での連続性を保つため、調整後の値は次のように定義される。
+\begin{equation}
+\mvar{UZR} = T_{\text{low}} - \frac{\ln(\delta_- + 1)}{\ln \beta}
+\end{equation}
+ここで $T_{\text{low}}$ は下限閾値 (例: $-1.2$)、$\beta$ は対数底 (例: $1.2$) であり、極端なエラー率を持つ選手の過度な価値毀損を緩和するよう較正されている。
+
+\paragraph{プラス調整 (圧縮):}
+同様に、$\mvar{UZR}_{\text{basic}} > T_{\text{high}}$ の場合、乖離幅を $\delta_+ = \mvar{UZR}_{\text{basic}} - T_{\text{high}}$ と定義する。プラスの外れ値は圧縮される。
+\begin{equation}
+\mvar{UZR} = T_{\text{high}} + \frac{\ln(\delta_+ + 1)}{\ln \beta}
+\end{equation}
+ここで $T_{\text{high}}$ は上限閾値 (例: $50$) である。この計算式により、守備の卓越した貢献が WAR 全体の分布を規定の上限を超えて不均衡にゆがめないことが保証される。
+
+\subsection{リプレースメントレベル}
+\begin{equation}
+\mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot 0.2}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot 0.1
+\end{equation}
+
+\subsection{1勝あたりの得点 (RPW)}
+1勝を生み出すために必要な得点数 $\mvar{RPW}_{\text{lg}}$ は、リーグの得点環境に基づいて動的に算出される。
+\begin{equation}
+\mvar{RPW}_{\text{lg}} = \mvar{BaseRPW} + \operatorname{sgn}(\Delta R) \cdot \ln(|\Delta R| + 1)
+\end{equation}
+ここで $\Delta R = R/G_{\text{lg}} - \mvar{BaseRuns}$ である。$\mvar{BaseRPW}$ および $\mvar{BaseRuns}$ はあらかじめ定められた基準定数である。特定シーズンにおける少ないサンプルサイズに起因する異常値を防ぐため、最終値には境界制約 (クリッピング) が適用される。
+
+\section{投手評価}
+投手 WAR は、守備の影響から投球パフォーマンスを分離するため、結果よりもプロセスを重視した FIP ベースのアプローチを採用する。
+\begin{equation}
+\mvar{WAR} = (\mvar{WAA} \cdot C_{\text{WAA}} + \mvar{Rep} \cdot C_{\text{Rep}} - \mvar{WHIP} \cdot C_{\text{WHIP}} + (\mvar{AvgIPA} - \mvar{IPA})) \cdot \mvar{RoleMult}_{\text{war}}
+\end{equation}
+
+\subsection{平均比較得点 (RAA)}
+\begin{equation}
+\mvar{FIP} = \frac{13 \cdot \mvar{HR} + 3 \cdot (\mvar{BB} + \mvar{HBP}) - 2 \cdot K}{\mvar{IP}} + C_{\text{fip}}
+\end{equation}
+
+RAA は FIP から算出され、ERA 乖離に対する調整 ($k_{\text{adj}}$) および先発投手の投球回効率 ($w_{\text{sp}}$) に関する調整を組み込んでいる。
+
+\begin{equation}
+\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{6 \cdot \max(\mvar{ERA} + \mvar{WHIP}, 1.5)} \cdot w_{\text{sp}}
+\end{equation}
+
+係数 $k_{\text{adj}}$ は乖離ペナルティとして機能し、$\mvar{ERA} \ge 3.0$ の場合は $3.0$、それ以外は $1.0$ と定義される。
+
+投球負荷調整係数 $w_{\text{sp}}$ は、先発投手における不十分な投球回の積み重ねに関連する\textbf{構造的価値毀損}を考慮するもので、ステップ関数として定式化される。
+
+\begin{equation}
+w_{\text{sp}} = \begin{cases}
+0.5 & \text{if } \frac{\mvar{IP}}{\mvar{Starts}} < \min(\mvar{AvgIPS} + 1.0, 8.0) \\
+1.0 & \text{otherwise}
+\end{cases}
+\end{equation}
+
+ここで $\mvar{AvgIPS}$ はリーグ平均の先発あたり投球回数を示す。
+
+\noindent 注: このペナルティは、試合途中降板による WAR 過剰評価を緩和するため、先発投手として登録された選手にのみ適用される。
+
+\subsection{WAA と RPW}
+投手固有の得点価値 ($\mvar{RPW}_{p}$) は非線形である。
+\begin{equation}
+\mvar{RPW}_{p} = 2 \cdot \left[ v_{\text{rpw}} \cdot \left( 3 \cdot \mvar{AvgRuns} - \frac{\mvar{RAA}}{\mvar{App}} \right) \right]^{0.715}
+\end{equation}
+$\mvar{WAA}$ は $\mvar{RAA} / \mvar{RPW}_{p}$ として算出される。
+
+\subsection{リプレースメントレベルとイニングペナルティ}
+\begin{equation}
+\mvar{Rep} = \left( \frac{0.105 \cdot \mvar{IP}}{9} + \frac{\mvar{Adj}_{\text{pos}} \cdot \mvar{IP}}{9 \cdot \mvar{InningsPenalty}} \right) \cdot \mvar{RoleMult}_{\text{rep}}
+\end{equation}
+$\mvar{InningsPenalty}$ は、低効率での投球回積み重ねのマイナス価値を考慮するもので、持続的な低パフォーマンスの代替困難性を反映している。
+\begin{equation}
+\mvar{InningsPenalty} = 1.0 + \max(0, (\mvar{ERA}+\mvar{WHIP}) - \mvar{Threshold}) \cdot \mvar{Multiplier}
+\end{equation}
+これにより、低品質なイニング (非効率な「イニング消化」) が WAR を不自然に押し上げないことが保証される。
+
+\subsection{IPA (イニングあたり打者数)}
+イニングあたりの対戦打者数を近似するカスタム指標である。
+\begin{equation}
+\mvar{IPA} = \frac{\mvar{IP} \cdot 3 + H + \mvar{BB} + \mvar{HBP}}{\mvar{IP}}
+\end{equation}
+
+\begin{thebibliography}{9}
+
+\bibitem{fangraphs}
+FanGraphs: WAR for Position Players [Accessed: Jan. 17, 2026] \\
+\refurl{https://library.fangraphs.com/war/war-position-players/}
+
+\bibitem{102_f}
+1.02 野球の道具箱: WAR (Wins Above Replacement) 【野手】 [Accessed: Jan. 17, 2026] \\
+\refurl{https://1point02.jp/op/gnav/glossary/gls_explanation.aspx?eid=20031}
+
+\bibitem{102_p}
+1.02 野球の道具箱: WAR (Wins Above Replacement) 【投手】 [Accessed: Jan. 17, 2026] \\
+\refurl{https://1point02.jp/op/gnav/glossary/gls_explanation.aspx?eid=20032}
+
+\bibitem{npb_stats}
+NPB STATS: 投手WAR [Accessed: Jan. 17, 2026] \\
+\refurl{http://npbstats.com/glossary/投手war/}
+
+\end{thebibliography}
+
+\section*{ライセンス}
+
+\noindent 本ドキュメントは \href{http://creativecommons.org/licenses/by-nc-nd/4.0/}{\textbf{CC BY-NC-ND 4.0}} (表示-非営利-改変禁止) の下でライセンスされています。
+
+\begin{itemize}
+    \item \textbf{BY (表示):} \textbf{SAN値直送} へのクレジット表示が必要です。
+    \item \textbf{NC (非営利):} 商業目的での使用は禁止です。
+    \item \textbf{ND (改変禁止):} 素材をリミックス・変形・派生物の作成を行った場合、改変した素材の配布は禁止です。
+\end{itemize}
+
+\end{document}

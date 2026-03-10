@@ -99,11 +99,11 @@ For cases where $\mvar{UZR}_{\text{basic}} \le T_{\text{low}}$, we define the de
 where $T_{\text{low}}$ is the lower bound threshold (e.g., $-1.2$) and $\beta$ is the logarithmic base (e.g., $1.2$), calibrated to mitigate excessive devaluation of players with extreme error rates.
 
 \paragraph{Positive Adjustment (Compression):}
-Similarly, for cases where $\mvar{UZR}_{\text{basic}} > T_{\text{high}}$, positive outliers are compressed:
+Similarly, for cases where $\mvar{UZR}_{\text{basic}} > T_{\text{high}}$, we define the deviation magnitude as $\delta_+ = \mvar{UZR}_{\text{basic}} - T_{\text{high}}$. Positive outliers are compressed:
 \begin{equation}
-\mvar{UZR} = T_{\text{high}} + \frac{\ln(\mvar{UZR}_{\text{basic}} - T_{\text{high}} + 1)}{\ln \beta}
+\mvar{UZR} = T_{\text{high}} + \frac{\ln(\delta_+ + 1)}{\ln \beta}
 \end{equation}
-where $T_{\text{high}}$ is the upper bound threshold (e.g., $1.2$). This formulation ensures that elite defensive impact does not disproportionately skew the overall WAR distribution beyond the specified limit.
+where $T_{\text{high}}$ is the upper bound threshold (e.g., $50$). This formulation ensures that elite defensive impact does not disproportionately skew the overall WAR distribution beyond the specified limit.
 
 \subsection{Replacement Level}
 \begin{equation}
