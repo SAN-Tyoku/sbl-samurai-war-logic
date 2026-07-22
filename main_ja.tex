@@ -62,7 +62,15 @@ SBL-WAR システムは、理論上のリプレースメントレベルに対す
 \begin{equation}
 \mvar{Batting} = f_{\text{tiered}}(\Delta \mvar{wRC}^+, \mvar{Tiers}) \times \mvar{ScaleFactor}
 \end{equation}
-注: $f_{\text{tiered}}$ は非線形減衰関数として機能し、極端な外れ値の影響を段階的に緩和する。
+階層的圧縮関数 $f_{\text{tiered}}$ は以下のように定義される。閾値の列を $t_0 < t_1 < \cdots < t_{n-1}$（ただし便宜上 $t_n \equiv \infty$ とする）、対応する指数を $e_0, \ldots, e_{n-1}$ とし、入力値の符号を $s = \operatorname{sign}(x)$、絶対値を $|x|$ とすると、
+\begin{equation}
+f_{\text{tiered}}(x, \mvar{Tiers}) =
+\begin{cases}
+x & (|x| \le t_0) \\
+s \left( t_0 + \displaystyle\sum_{i=0}^{n-1} \left(\min(|x|, t_{i+1}) - t_i\right)^{e_i} \cdot \mathbb{1}_{\{|x| > t_i\}} \right) & (|x| > t_0)
+\end{cases}
+\end{equation}
+と表される。これは累進課税のような構造であり、乖離値が各閾値を超えるごとに、その超過分を指数 $e_i$（多くの場合 $e_i < 1$）でべき乗することで、超過分に対する「税率」を段階的に逓減させる。これにより、極端な外れ値がそのまま線形にWARへ反映されることを防ぎ、評価の安定性を確保している。
 
 \subsection{走塁貢献}
 加重盗塁得点 ($\mvar{wSB}$) および総合走塁 ($\mvar{UBR}$) は次のように定義される。

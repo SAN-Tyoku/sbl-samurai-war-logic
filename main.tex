@@ -29,7 +29,7 @@
 }
 
 \title{\textbf{Methodology for SBL-WAR Calculation}}
-\author{SAN-Chi Chokusou \\ \small Lead Architect, SBL Samurai Japan Project}
+\author{SAN-Chi Chokusou \\ SBL Samurai Japan Project}
 \date{\EnToday}
 
 \begin{document}
@@ -68,7 +68,15 @@ The final $\mvar{Batting}$ component applies a \textbf{hierarchical compression 
 \begin{equation}
 \mvar{Batting} = f_{\text{tiered}}(\Delta \mvar{wRC}^+, \mvar{Tiers}) \times \mvar{ScaleFactor}
 \end{equation}
-Note: $f_{\text{tiered}}$ acts as a non-linear damping function that progressively mitigates the impact of extreme outliers.
+The compression function $f_{\text{tiered}}$ is formally defined as follows. Given a sequence of tier thresholds $t_0 < t_1 < \cdots < t_{n-1}$ (with $t_n \equiv \infty$) and corresponding exponents $e_0, \ldots, e_{n-1}$, let $s = \operatorname{sign}(x)$ and $|x|$ denote the magnitude of the input deviation. Then:
+\begin{equation}
+f_{\text{tiered}}(x, \mvar{Tiers}) =
+\begin{cases}
+x & \text{if } |x| \le t_0 \\
+s \left( t_0 + \displaystyle\sum_{i=0}^{n-1} \left(\min(|x|, t_{i+1}) - t_i\right)^{e_i} \cdot \mathbb{1}_{\{|x| > t_i\}} \right) & \text{if } |x| > t_0
+\end{cases}
+\end{equation}
+Intuitively, this behaves like a progressive tax bracket: each unit of deviation is "charged" at a diminishing rate (via $e_i < 1$) once it crosses a given threshold, ensuring extreme values are compressed rather than linearly propagated.
 
 \subsection{Baserunning Contribution}
 Weighted Stolen Base Runs ($\mvar{wSB}$) and Ultimate Base Running ($\mvar{UBR}$) are defined as:
