@@ -61,7 +61,7 @@ Using the league average $\mvar{wOBA}_{\text{lg}}$, the scaling factor $\mvar{wO
 
 Subsequently, the standardized metric $\mvar{wRC}^+$ is calculated:
 \begin{equation}
-\mvar{wRC}^+ = \frac{\frac{(\mvar{wOBA} - \mvar{wOBA}_{\text{lg}})}{\mvar{wOBAScale}} + R/\mvar{PA}_{\text{lg}}}{R/\mvar{PA}_{\text{lg}}} \times 100
+\mvar{wRC}^+ = \frac{\frac{(\mvar{wOBA} - \mvar{wOBA}_{\text{lg}})}{\mvar{wOBAScale}} + R/\mvar{PA}_{\text{lg}}}{R/\mvar{PA}_{\text{lg}}} \times \kappa_{\text{index}}
 \end{equation}
 
 The final $\mvar{Batting}$ component applies a \textbf{hierarchical compression function} ($f_{\text{tiered}}$) to the deviation from the league mean ($\Delta \mvar{wRC}^+ = \mvar{wRC}^+ - \mvar{wRC}^+_{\text{lg}}$):
@@ -81,7 +81,7 @@ Intuitively, this behaves like a progressive tax bracket: each unit of deviation
 \subsection{Baserunning Contribution}
 Weighted Stolen Base Runs ($\mvar{wSB}$) and Ultimate Base Running ($\mvar{UBR}$) are defined as:
 \begin{equation}
-\mvar{wSB} = \left[ (\mvar{SB} \cdot 0.2 + \mvar{CS} \cdot (-0.398)) - (\mvar{LgRunRate} \cdot (\mvar{1B} + \mvar{BB} + \mvar{HBP})) \right] \times 0.1
+\mvar{wSB} = \left[ (\mvar{SB} \cdot \lambda_{\text{sb}} + \mvar{CS} \cdot \lambda_{\text{cs}}) - (\mvar{LgRunRate} \cdot (\mvar{1B} + \mvar{BB} + \mvar{HBP})) \right] \times \kappa_{\text{wsb}}
 \end{equation}
 \begin{equation}
 \mvar{UBR} = (\mvar{GoodBR} \cdot \mvar{Point}_{\text{Good}}) + (\mvar{DP} \cdot \mvar{Point}_{\text{DP}})
@@ -92,8 +92,8 @@ The total baserunning value is $\mvar{Baserunning} = (\mvar{wSB} + \mvar{UBR}) \
 Fielding value is defined as $\mvar{Fielding} = \mvar{UZR} + \mvar{PosAdj}$.
 \begin{equation}
 \mvar{UZR}_{\text{basic}} = \begin{cases}
-(\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot 6) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{for Catchers}) \\
-(\mvar{FinePlay} - E \cdot 2) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{for Others})
+(\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot \lambda_{\text{err-c}}) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{for Catchers}) \\
+(\mvar{FinePlay} - E \cdot \lambda_{\text{err-f}}) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{for Others})
 \end{cases}
 \end{equation}
 
@@ -102,28 +102,28 @@ To ensure statistical stability and account for diminishing marginal utility, lo
 \paragraph{Negative Adjustment (Error Correction):}
 For cases where $\mvar{UZR}_{\text{basic}} \le T_{\text{low}}$, we define the deviation magnitude as $\delta_- = \lvert \mvar{UZR}_{\text{basic}} - T_{\text{low}} \rvert$. To maintain continuity at the threshold, the adjusted value is defined as:
 \begin{equation}
-\mvar{UZR} = T_{\text{low}} - \frac{\ln(\delta_- + 1)}{\ln \beta}
+\mvar{UZR} = T_{\text{low}} - \frac{\ln(\delta_- + \tau_{\log})}{\ln \beta}
 \end{equation}
-where $T_{\text{low}}$ is the lower bound threshold (e.g., $-1.2$) and $\beta$ is the logarithmic base (e.g., $1.2$), calibrated to mitigate excessive devaluation of players with extreme error rates.
+where $T_{\text{low}}$ is the lower bound threshold and $\beta$ is the logarithmic base, both calibrated to mitigate excessive devaluation of players with extreme error rates.
 
 \paragraph{Positive Adjustment (Compression):}
 Similarly, for cases where $\mvar{UZR}_{\text{basic}} > T_{\text{high}}$, we define the deviation magnitude as $\delta_+ = \mvar{UZR}_{\text{basic}} - T_{\text{high}}$. Positive outliers are compressed:
 \begin{equation}
-\mvar{UZR} = T_{\text{high}} + \frac{\ln(\delta_+ + 1)}{\ln \beta}
+\mvar{UZR} = T_{\text{high}} + \frac{\ln(\delta_+ + \tau_{\log})}{\ln \beta}
 \end{equation}
-where $T_{\text{high}}$ is the upper bound threshold (e.g., $50$). This formulation ensures that elite defensive impact does not disproportionately skew the overall WAR distribution beyond the specified limit.
+where $T_{\text{high}}$ is the upper bound threshold. This formulation ensures that elite defensive impact does not disproportionately skew the overall WAR distribution beyond the specified limit.
 
 \subsection{Replacement Level}
 \begin{equation}
-\mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot 0.2}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot 0.1
+\mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot \rho_{\text{rep}}}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot \kappa_{\text{rep}}
 \end{equation}
 
 \subsection{Runs Per Win (RPW)}
 The value of runs required to generate one win, denoted as $\mvar{RPW}_{\text{lg}}$, is calculated dynamically based on the league's scoring environment:
 \begin{equation}
-\mvar{RPW}_{\text{lg}} = \mvar{BaseRPW} + \operatorname{sgn}(\Delta R) \cdot \ln(|\Delta R| + 1)
+\mvar{RPW}_{\text{lg}} = \mvar{BaseRPW} + \operatorname{sgn}(\Delta R) \cdot \ln(|\Delta R| + \tau_{\log})
 \end{equation}
-where $\Delta R = R/G_{\text{lg}} - \mvar{BaseRuns}$. Note that $\mvar{BaseRPW}$ and $\mvar{BaseRuns}$ are predetermined baseline constants. Boundary constraints (clipping) are applied to the final value to prevent anomalies caused by small sample sizes in specific seasons.
+where $\Delta R = R/G_{\text{lg}} - \mvar{BaseRuns}$. Note that $\mvar{BaseRPW}$ and $\mvar{BaseRuns}$ are predetermined baseline constants. Boundary constraints (clipping) are applied to the final value to prevent anomalies caused by small sample sizes in specific seasons. The coefficients introduced in this section are maintained in the league calibration profile.
 
 \section{Pitcher Evaluation}
 Pitcher WAR emphasizes process over results (FIP-based) to isolate pitching performance from defensive variance:
@@ -133,23 +133,30 @@ Pitcher WAR emphasizes process over results (FIP-based) to isolate pitching perf
 
 \subsection{Runs Above Average (RAA)}
 \begin{equation}
-\mvar{FIP} = \frac{13 \cdot \mvar{HR} + 3 \cdot (\mvar{BB} + \mvar{HBP}) - 2 \cdot K}{\mvar{IP}} + C_{\text{fip}}
+\mvar{FIP} = \frac{\lambda_{\text{hr}} \cdot \mvar{HR} + \lambda_{\text{bb}} \cdot (\mvar{BB} + \mvar{HBP}) - \lambda_{\text{k}} \cdot K}{\mvar{IP}} + C_{\text{fip}}
 \end{equation}
 
 RAA is derived from FIP, incorporating specific adjustments for ERA divergence ($k_{\text{adj}}$) and starting pitcher workload efficiency ($w_{\text{sp}}$):
 
 \begin{equation}
-\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{6 \cdot \max(\mvar{ERA} + \mvar{WHIP}, 1.5)} \cdot w_{\text{sp}}
+\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{\kappa_{\text{out}} \cdot \max(\mvar{ERA} + \mvar{WHIP}, \tau_{\text{floor}})} \cdot w_{\text{sp}}
 \end{equation}
 
-The coefficient $k_{\text{adj}}$ serves as a divergence penalty, defined as $3.0$ when $\mvar{ERA} \ge 3.0$, and $1.0$ otherwise.
+The coefficient $k_{\text{adj}}$ serves as a divergence penalty. It is selected from the calibrated pair $(\kappa_{\text{div}}, \kappa_{\text{base}})$ according to the ERA regime, with the transition determined by $\tau_{\text{era}}$:
+\begin{equation}
+k_{\text{adj}} = \begin{cases}
+\kappa_{\text{div}} & \text{if } \mvar{ERA} \ge \tau_{\text{era}} \\
+\kappa_{\text{base}} & \text{otherwise}
+\end{cases}
+\end{equation}
+The symbols $\kappa_{\text{div}}$, $\kappa_{\text{base}}$, $\tau_{\text{era}}$, $\kappa_{\text{out}}$, and $\tau_{\text{floor}}$ denote league-calibrated coefficients rather than fixed universal constants.
 
 The workload adjustment factor $w_{\text{sp}}$ accounts for the \textbf{structural devaluation} associated with insufficient inning accumulation by starting pitchers. It is formulated as a step function:
 
 \begin{equation}
 w_{\text{sp}} = \begin{cases} 
-0.5 & \text{if } \frac{\mvar{IP}}{\mvar{Starts}} < \min(\mvar{AvgIPS} + 1.0, 8.0) \\
-1.0 & \text{otherwise}
+\omega_{\text{short}} & \text{if } \frac{\mvar{IP}}{\mvar{Starts}} < \min(\mvar{AvgIPS} + \delta_{\text{ips}}, \tau_{\text{ips}}) \\
+\omega_{\text{full}} & \text{otherwise}
 \end{cases}
 \end{equation}
 
@@ -160,25 +167,26 @@ Here, $\mvar{AvgIPS}$ denotes the league average Innings Per Start.
 \subsection{WAA and RPW}
 The pitcher-specific run value ($\mvar{RPW}_{p}$) is non-linear:
 \begin{equation}
-\mvar{RPW}_{p} = 2 \cdot \left[ v_{\text{rpw}} \cdot \left( 3 \cdot \mvar{AvgRuns} - \frac{\mvar{RAA}}{\mvar{App}} \right) \right]^{0.715}
+\mvar{RPW}_{p} = \kappa_{\text{rpw}} \cdot \left[ v_{\text{rpw}} \cdot \left( \rho_{\text{context}} \cdot \mvar{AvgRuns} - \frac{\mvar{RAA}}{\mvar{App}} \right) \right]^{\gamma_{\text{rpw}}}
 \end{equation}
-$\mvar{WAA}$ is derived as $\mvar{RAA} / \mvar{RPW}_{p}$.
+$\mvar{WAA}$ is derived as $\mvar{RAA} / \mvar{RPW}_{p}$. The exponent $\gamma_{\text{rpw}}$ and context coefficient $\rho_{\text{context}}$ control the degree of non-linearity and are maintained as calibrated model parameters.
 
 \subsection{Replacement Level \& Innings Penalty}
 \begin{equation}
-\mvar{Rep} = \left( \frac{0.105 \cdot \mvar{IP}}{9} + \frac{\mvar{Adj}_{\text{pos}} \cdot \mvar{IP}}{9 \cdot \mvar{InningsPenalty}} \right) \cdot \mvar{RoleMult}_{\text{rep}}
+\mvar{Rep} = \left( \frac{\rho_{\text{rep}} \cdot \mvar{IP}}{\kappa_{\text{inning}}} + \frac{\mvar{Adj}_{\text{pos}} \cdot \mvar{IP}}{\kappa_{\text{inning}} \cdot \mvar{InningsPenalty}} \right) \cdot \mvar{RoleMult}_{\text{rep}}
 \end{equation}
 The term $\mvar{InningsPenalty}$ accounts for the negative value of accumulating innings with poor efficiency, reflecting the structural difficulty of replacing sustained underperformance.
 \begin{equation}
-\mvar{InningsPenalty} = 1.0 + \max(0, (\mvar{ERA}+\mvar{WHIP}) - \mvar{Threshold}) \cdot \mvar{Multiplier}
+\mvar{InningsPenalty} = \kappa_{\text{penalty}} + \max(0, (\mvar{ERA}+\mvar{WHIP}) - \mvar{Threshold}) \cdot \mvar{Multiplier}
 \end{equation}
 This ensures that low-quality innings ("eating innings" with poor efficiency) do not artificially inflate WAR.
 
 \subsection{IPA (Innings per Plate Appearance)}
 A custom metric approximating batters faced per inning:
 \begin{equation}
-\mvar{IPA} = \frac{\mvar{IP} \cdot 3 + H + \mvar{BB} + \mvar{HBP}}{\mvar{IP}}
+\mvar{IPA} = \frac{\mvar{IP} \cdot \kappa_{\text{outs}} + H + \mvar{BB} + \mvar{HBP}}{\mvar{IP}}
 \end{equation}
+The coefficients $\lambda_{\text{hr}}$, $\lambda_{\text{bb}}$, $\lambda_{\text{k}}$, and $\kappa_{\text{outs}}$ are maintained as part of the league calibration profile.
 
 \begin{thebibliography}{9}
 

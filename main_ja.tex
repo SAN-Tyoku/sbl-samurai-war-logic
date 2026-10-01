@@ -55,7 +55,7 @@ SBL-WAR システムは、理論上のリプレースメントレベルに対す
 
 次に、標準化指標 $\mvar{wRC}^+$ を算出する。
 \begin{equation}
-\mvar{wRC}^+ = \frac{\frac{(\mvar{wOBA} - \mvar{wOBA}_{\text{lg}})}{\mvar{wOBAScale}} + R/\mvar{PA}_{\text{lg}}}{R/\mvar{PA}_{\text{lg}}} \times 100
+\mvar{wRC}^+ = \frac{\frac{(\mvar{wOBA} - \mvar{wOBA}_{\text{lg}})}{\mvar{wOBAScale}} + R/\mvar{PA}_{\text{lg}}}{R/\mvar{PA}_{\text{lg}}} \times \kappa_{\text{index}}
 \end{equation}
 
 最終的な $\mvar{Batting}$ 成分は、リーグ平均からの乖離 ($\Delta \mvar{wRC}^+ = \mvar{wRC}^+ - \mvar{wRC}^+_{\text{lg}}$) に対して\textbf{階層的圧縮関数} ($f_{\text{tiered}}$) を適用する。
@@ -75,7 +75,7 @@ s \left( t_0 + \displaystyle\sum_{i=0}^{n-1} \left(\min(|x|, t_{i+1}) - t_i\righ
 \subsection{走塁貢献}
 加重盗塁得点 ($\mvar{wSB}$) および総合走塁 ($\mvar{UBR}$) は次のように定義される。
 \begin{equation}
-\mvar{wSB} = \left[ (\mvar{SB} \cdot 0.2 + \mvar{CS} \cdot (-0.398)) - (\mvar{LgRunRate} \cdot (\mvar{1B} + \mvar{BB} + \mvar{HBP})) \right] \times 0.1
+\mvar{wSB} = \left[ (\mvar{SB} \cdot \lambda_{\text{sb}} + \mvar{CS} \cdot \lambda_{\text{cs}}) - (\mvar{LgRunRate} \cdot (\mvar{1B} + \mvar{BB} + \mvar{HBP})) \right] \times \kappa_{\text{wsb}}
 \end{equation}
 \begin{equation}
 \mvar{UBR} = (\mvar{GoodBR} \cdot \mvar{Point}_{\text{Good}}) + (\mvar{DP} \cdot \mvar{Point}_{\text{DP}})
@@ -86,8 +86,8 @@ s \left( t_0 + \displaystyle\sum_{i=0}^{n-1} \left(\min(|x|, t_{i+1}) - t_i\righ
 守備値は $\mvar{Fielding} = \mvar{UZR} + \mvar{PosAdj}$ として定義される。
 \begin{equation}
 \mvar{UZR}_{\text{basic}} = \begin{cases}
-(\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot 6) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{捕手}) \\
-(\mvar{FinePlay} - E \cdot 2) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{その他})
+(\mvar{CS} \cdot w_{\text{cs}} - \mvar{SBA} - E \cdot \lambda_{\text{err-c}}) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{捕手}) \\
+(\mvar{FinePlay} - E \cdot \lambda_{\text{err-f}}) \cdot \frac{C_{\text{pos}}}{G} \cdot \mvar{AvgG} & (\text{その他})
 \end{cases}
 \end{equation}
 
@@ -96,28 +96,28 @@ s \left( t_0 + \displaystyle\sum_{i=0}^{n-1} \left(\min(|x|, t_{i+1}) - t_i\righ
 \paragraph{マイナス調整 (エラー補正):}
 $\mvar{UZR}_{\text{basic}} \le T_{\text{low}}$ の場合、乖離幅を $\delta_- = \lvert \mvar{UZR}_{\text{basic}} - T_{\text{low}} \rvert$ と定義する。閾値での連続性を保つため、調整後の値は次のように定義される。
 \begin{equation}
-\mvar{UZR} = T_{\text{low}} - \frac{\ln(\delta_- + 1)}{\ln \beta}
+\mvar{UZR} = T_{\text{low}} - \frac{\ln(\delta_- + \tau_{\log})}{\ln \beta}
 \end{equation}
-ここで $T_{\text{low}}$ は下限閾値 (例: $-1.2$)、$\beta$ は対数底 (例: $1.2$) であり、極端なエラー率を持つ選手の過度な価値毀損を緩和するよう較正されている。
+ここで $T_{\text{low}}$ は下限閾値、$\beta$ は対数底であり、極端なエラー率を持つ選手の過度な価値毀損を緩和するよう較正されている。
 
 \paragraph{プラス調整 (圧縮):}
 同様に、$\mvar{UZR}_{\text{basic}} > T_{\text{high}}$ の場合、乖離幅を $\delta_+ = \mvar{UZR}_{\text{basic}} - T_{\text{high}}$ と定義する。プラスの外れ値は圧縮される。
 \begin{equation}
-\mvar{UZR} = T_{\text{high}} + \frac{\ln(\delta_+ + 1)}{\ln \beta}
+\mvar{UZR} = T_{\text{high}} + \frac{\ln(\delta_+ + \tau_{\log})}{\ln \beta}
 \end{equation}
-ここで $T_{\text{high}}$ は上限閾値 (例: $50$) である。この計算式により、守備の卓越した貢献が WAR 全体の分布を規定の上限を超えて不均衡にゆがめないことが保証される。
+ここで $T_{\text{high}}$ は上限閾値である。この計算式により、守備の卓越した貢献が WAR 全体の分布を規定の上限を超えて不均衡にゆがめないことが保証される。
 
 \subsection{リプレースメントレベル}
 \begin{equation}
-\mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot 0.2}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot 0.1
+\mvar{Replacement} = \frac{\mvar{wOBA}_{\text{lg}} \cdot \rho_{\text{rep}}}{\mvar{wOBAScale}} \cdot \mvar{PA} \cdot \kappa_{\text{rep}}
 \end{equation}
 
 \subsection{1勝あたりの得点 (RPW)}
 1勝を生み出すために必要な得点数 $\mvar{RPW}_{\text{lg}}$ は、リーグの得点環境に基づいて動的に算出される。
 \begin{equation}
-\mvar{RPW}_{\text{lg}} = \mvar{BaseRPW} + \operatorname{sgn}(\Delta R) \cdot \ln(|\Delta R| + 1)
+\mvar{RPW}_{\text{lg}} = \mvar{BaseRPW} + \operatorname{sgn}(\Delta R) \cdot \ln(|\Delta R| + \tau_{\log})
 \end{equation}
-ここで $\Delta R = R/G_{\text{lg}} - \mvar{BaseRuns}$ である。$\mvar{BaseRPW}$ および $\mvar{BaseRuns}$ はあらかじめ定められた基準定数である。特定シーズンにおける少ないサンプルサイズに起因する異常値を防ぐため、最終値には境界制約 (クリッピング) が適用される。
+ここで $\Delta R = R/G_{\text{lg}} - \mvar{BaseRuns}$ である。$\mvar{BaseRPW}$ および $\mvar{BaseRuns}$ はあらかじめ定められた基準定数である。特定シーズンにおける少ないサンプルサイズに起因する異常値を防ぐため、最終値には境界制約 (クリッピング) が適用される。本節で導入した係数は、リーグ校正プロファイルの一部として管理される。
 
 \section{投手評価}
 投手 WAR は、守備の影響から投球パフォーマンスを分離するため、結果よりもプロセスを重視した FIP ベースのアプローチを採用する。
@@ -127,23 +127,30 @@ $\mvar{UZR}_{\text{basic}} \le T_{\text{low}}$ の場合、乖離幅を $\delta_
 
 \subsection{平均比較得点 (RAA)}
 \begin{equation}
-\mvar{FIP} = \frac{13 \cdot \mvar{HR} + 3 \cdot (\mvar{BB} + \mvar{HBP}) - 2 \cdot K}{\mvar{IP}} + C_{\text{fip}}
+\mvar{FIP} = \frac{\lambda_{\text{hr}} \cdot \mvar{HR} + \lambda_{\text{bb}} \cdot (\mvar{BB} + \mvar{HBP}) - \lambda_{\text{k}} \cdot K}{\mvar{IP}} + C_{\text{fip}}
 \end{equation}
 
 RAA は FIP から算出され、ERA 乖離に対する調整 ($k_{\text{adj}}$) および先発投手の投球回効率 ($w_{\text{sp}}$) に関する調整を組み込んでいる。
 
 \begin{equation}
-\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{6 \cdot \max(\mvar{ERA} + \mvar{WHIP}, 1.5)} \cdot w_{\text{sp}}
+\mvar{RAA} = \frac{(\mvar{AvgRuns} - \mvar{FIP} - \mvar{ERA} \cdot C_{\text{era}} \cdot k_{\text{adj}}) \cdot \mvar{IP}}{\kappa_{\text{out}} \cdot \max(\mvar{ERA} + \mvar{WHIP}, \tau_{\text{floor}})} \cdot w_{\text{sp}}
 \end{equation}
 
-係数 $k_{\text{adj}}$ は乖離ペナルティとして機能し、$\mvar{ERA} \ge 3.0$ の場合は $3.0$、それ以外は $1.0$ と定義される。
+係数 $k_{\text{adj}}$ は乖離ペナルティとして機能する。これは校正済みの係数対 $(\kappa_{\text{div}}, \kappa_{\text{base}})$ から、ERA の領域に応じて選択される。切替点は $\tau_{\text{era}}$ とする。
+\begin{equation}
+k_{\text{adj}} = \begin{cases}
+\kappa_{\text{div}} & \text{if } \mvar{ERA} \ge \tau_{\text{era}} \\
+\kappa_{\text{base}} & \text{otherwise}
+\end{cases}
+\end{equation}
+ここで $\kappa_{\text{div}}$、$\kappa_{\text{base}}$、$\tau_{\text{era}}$、$\kappa_{\text{out}}$、$\tau_{\text{floor}}$ は、普遍的な固定値ではなく、リーグ環境から校正される係数である。
 
 投球負荷調整係数 $w_{\text{sp}}$ は、先発投手における不十分な投球回の積み重ねに関連する\textbf{構造的価値毀損}を考慮するもので、ステップ関数として定式化される。
 
 \begin{equation}
 w_{\text{sp}} = \begin{cases}
-0.5 & \text{if } \frac{\mvar{IP}}{\mvar{Starts}} < \min(\mvar{AvgIPS} + 1.0, 8.0) \\
-1.0 & \text{otherwise}
+\omega_{\text{short}} & \text{if } \frac{\mvar{IP}}{\mvar{Starts}} < \min(\mvar{AvgIPS} + \delta_{\text{ips}}, \tau_{\text{ips}}) \\
+\omega_{\text{full}} & \text{otherwise}
 \end{cases}
 \end{equation}
 
@@ -154,25 +161,26 @@ w_{\text{sp}} = \begin{cases}
 \subsection{WAA と RPW}
 投手固有の得点価値 ($\mvar{RPW}_{p}$) は非線形である。
 \begin{equation}
-\mvar{RPW}_{p} = 2 \cdot \left[ v_{\text{rpw}} \cdot \left( 3 \cdot \mvar{AvgRuns} - \frac{\mvar{RAA}}{\mvar{App}} \right) \right]^{0.715}
+\mvar{RPW}_{p} = \kappa_{\text{rpw}} \cdot \left[ v_{\text{rpw}} \cdot \left( \rho_{\text{context}} \cdot \mvar{AvgRuns} - \frac{\mvar{RAA}}{\mvar{App}} \right) \right]^{\gamma_{\text{rpw}}}
 \end{equation}
-$\mvar{WAA}$ は $\mvar{RAA} / \mvar{RPW}_{p}$ として算出される。
+$\mvar{WAA}$ は $\mvar{RAA} / \mvar{RPW}_{p}$ として算出される。指数 $\gamma_{\text{rpw}}$ および文脈係数 $\rho_{\text{context}}$ は、非線形性の強度を制御する校正済みモデルパラメータとして管理される。
 
 \subsection{リプレースメントレベルとイニングペナルティ}
 \begin{equation}
-\mvar{Rep} = \left( \frac{0.105 \cdot \mvar{IP}}{9} + \frac{\mvar{Adj}_{\text{pos}} \cdot \mvar{IP}}{9 \cdot \mvar{InningsPenalty}} \right) \cdot \mvar{RoleMult}_{\text{rep}}
+\mvar{Rep} = \left( \frac{\rho_{\text{rep}} \cdot \mvar{IP}}{\kappa_{\text{inning}}} + \frac{\mvar{Adj}_{\text{pos}} \cdot \mvar{IP}}{\kappa_{\text{inning}} \cdot \mvar{InningsPenalty}} \right) \cdot \mvar{RoleMult}_{\text{rep}}
 \end{equation}
 $\mvar{InningsPenalty}$ は、低効率での投球回積み重ねのマイナス価値を考慮するもので、持続的な低パフォーマンスの代替困難性を反映している。
 \begin{equation}
-\mvar{InningsPenalty} = 1.0 + \max(0, (\mvar{ERA}+\mvar{WHIP}) - \mvar{Threshold}) \cdot \mvar{Multiplier}
+\mvar{InningsPenalty} = \kappa_{\text{penalty}} + \max(0, (\mvar{ERA}+\mvar{WHIP}) - \mvar{Threshold}) \cdot \mvar{Multiplier}
 \end{equation}
 これにより、低品質なイニング (非効率な「イニング消化」) が WAR を不自然に押し上げないことが保証される。
 
 \subsection{IPA (イニングあたり打者数)}
 イニングあたりの対戦打者数を近似するカスタム指標である。
 \begin{equation}
-\mvar{IPA} = \frac{\mvar{IP} \cdot 3 + H + \mvar{BB} + \mvar{HBP}}{\mvar{IP}}
+\mvar{IPA} = \frac{\mvar{IP} \cdot \kappa_{\text{outs}} + H + \mvar{BB} + \mvar{HBP}}{\mvar{IP}}
 \end{equation}
+係数 $\lambda_{\text{hr}}$、$\lambda_{\text{bb}}$、$\lambda_{\text{k}}$、$\kappa_{\text{outs}}$ は、リーグ校正プロファイルの一部として管理される。
 
 \begin{thebibliography}{9}
 
