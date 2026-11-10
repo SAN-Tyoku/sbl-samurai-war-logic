@@ -52,7 +52,7 @@ Fielder WAR is derived using the following formula:
 \subsection{Batting Contribution}
 First, Weighted On-Base Average (wOBA) is computed using linear weights:
 \begin{equation}
-\mvar{wOBA} = \frac{w_1 \cdot \mvar{uBB} + w_2 \cdot \mvar{HBP} + w_3 \cdot \mvar{1B} + w_4 \cdot \mvar{2B} + w_5 \cdot \mvar{3B} + w_6 \cdot \mvar{HR}}{\mvar{PA}}
+\mvar{wOBA} = \frac{w_1 \cdot \mvar{uBB} + w_2 \cdot \mvar{HBP} + w_3 \cdot \mvar{1B} + w_4 \cdot \mvar{2B} + w_5 \cdot \mvar{3B} + w_6 \cdot \mvar{HR}}{\mvar{PA} - \mvar{Bunt}}
 \end{equation}
 Using the league average $\mvar{wOBA}_{\text{lg}}$, the scaling factor $\mvar{wOBAScale}$ is determined to match the On-Base Percentage (OBP) scale:
 \begin{equation}

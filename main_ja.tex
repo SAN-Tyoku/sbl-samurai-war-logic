@@ -46,7 +46,7 @@ SBL-WAR システムは、理論上のリプレースメントレベルに対す
 \subsection{打撃貢献}
 まず、線形ウェイトを用いて加重出塁率 (wOBA) を算出する。
 \begin{equation}
-\mvar{wOBA} = \frac{w_1 \cdot \mvar{uBB} + w_2 \cdot \mvar{HBP} + w_3 \cdot \mvar{1B} + w_4 \cdot \mvar{2B} + w_5 \cdot \mvar{3B} + w_6 \cdot \mvar{HR}}{\mvar{PA}}
+\mvar{wOBA} = \frac{w_1 \cdot \mvar{uBB} + w_2 \cdot \mvar{HBP} + w_3 \cdot \mvar{1B} + w_4 \cdot \mvar{2B} + w_5 \cdot \mvar{3B} + w_6 \cdot \mvar{HR}}{\mvar{PA} - \mvar{Bunt}}
 \end{equation}
 リーグ平均 $\mvar{wOBA}_{\text{lg}}$ を用いて、出塁率 (OBP) スケールに合わせるためのスケーリング係数 $\mvar{wOBAScale}$ を決定する。
 \begin{equation}
